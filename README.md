@@ -23,17 +23,21 @@ If the video does not render in your browser, open it directly:
 
 [![ChessGNN Lichess demo thumbnail](docs/demo/lichess_chessgnn_demo.jpg)](docs/demo/lichess_chessgnn_demo.mp4)
 
+Demo: ChessGNN checkpoint playing as White against Lichess AI Level 6 through
+the Lichess bot adapter.
+
 The demo video shows ChessGNN running as a live Lichess bot through the
 Lichess bot bridge used during local development. The bot loads a PyTorch
 checkpoint, converts the current Lichess board to a graph with `python-chess`,
 masks illegal moves, and selects a move from the model policy head. The local
 development version also supports optional latent MCTS-style search.
 
-Current qualitative result: the Phase 1 policy/value checkpoint can play legal
-and coherent games online without hand-written chess search, with stronger play
-in opening/middlegame positions than in endgames. Formal Elo is not claimed yet;
-evaluation tooling was built locally to make future comparisons reproducible and
-balanced by color and Lichess AI level.
+Current qualitative result: in informal personal testing, the Phase 1
+policy/value checkpoint consistently beat Stockfish/Lichess AI Level 5 and
+remained competitive against Level 6 through the middlegame, while still
+struggling in endgames. Formal Elo evaluation is pending; evaluation tooling was
+built locally to make future comparisons reproducible and balanced by color and
+Lichess AI level.
 
 ## Motivation / Problem
 
@@ -225,23 +229,6 @@ policy_index = move.from_square * 64 + move.to_square
 The model outputs a dense 4096-way policy, then masks it with the legal move
 matrix from `python-chess`.
 
-## Public Repository Contents
-
-This public repository is currently a portfolio documentation package, not the
-full training code release. It intentionally contains only:
-
-| Path | Purpose |
-| --- | --- |
-| `README.md` | Architecture, motivation, demo notes, and project status |
-| `docs/demo/lichess_chessgnn_demo.mp4` | Compressed Lichess gameplay demo |
-| `docs/demo/lichess_chessgnn_demo.jpg` | Demo thumbnail / fallback preview |
-
-The implementation code, training scripts, checkpoints, logs, private tokens,
-and large experiment artifacts are not included in this public repo yet.
-The README describes the implemented local system so recruiters and technical
-reviewers can understand the architecture without downloading large model
-artifacts or private development files.
-
 ## Implementation Scope
 
 The local implementation is organized around these components:
@@ -259,9 +246,6 @@ The local implementation is organized around these components:
 | Energy model | Scores graph states for legality correction experiments |
 | Self-play/search layer | Uses replay, latent search, and optional MCTS-style planning |
 | Lichess adapter | Connects a trained checkpoint to live online play |
-
-This avoids listing source paths that are not present in the public repo while
-still documenting what was built.
 
 ## Demo Setup Summary
 
@@ -290,6 +274,8 @@ Before making any formal strength claim, the evaluation should use:
 This is why the README only makes a qualitative demo claim rather than a formal
 rating claim.
 
+Full training code and checkpoints are available on request.
+
 ## Current Status and Limitations
 
 What is solid:
@@ -315,23 +301,3 @@ Known modeling risks:
 - VAE KL can dominate if warmup/free-bits are poorly tuned.
 - EBM negatives can become too easy if corruption is unrealistic.
 - Self-play search must match the same encoder path used during training.
-
-## Resume Summary
-
-This project demonstrates:
-
-- Deep learning model design in PyTorch and PyTorch Geometric style.
-- Graph neural networks for structured relational reasoning.
-- Transformer-based sequence modeling with causal attention and RoPE.
-- VAE, diffusion, and energy-based modeling for world-model research.
-- Reinforcement learning infrastructure with replay buffers and MCTS-style
-  search.
-- Practical deployment through a live Lichess bot and web demo.
-
-Short CV version:
-
-> Built a supervised GNN + Transformer chess policy/value model over
-> heterogeneous board graphs. Designed an Edge-Conditioned GATv2 encoder with a
-> causal RoPE Transformer and square-level cross-attention. Extended the system
-> toward a latent world model with VAE, transition Transformer, diffusion graph
-> refinement, EBM legality scoring, and self-play search infrastructure.
