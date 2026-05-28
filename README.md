@@ -16,24 +16,23 @@ moves, attacks, defenses, pins, king zones, pawn structure, and game history.
 
 ## Demo
 
-[![ChessGNN Lichess demo](docs/demo/lichess_chessgnn_demo.jpg)](docs/demo/lichess_chessgnn_demo.mp4)
+<video src="docs/demo/lichess_chessgnn_demo.mp4" controls width="100%"></video>
+
+If the video does not render in your browser, open it directly:
+[docs/demo/lichess_chessgnn_demo.mp4](docs/demo/lichess_chessgnn_demo.mp4)
+
+[![ChessGNN Lichess demo thumbnail](docs/demo/lichess_chessgnn_demo.jpg)](docs/demo/lichess_chessgnn_demo.mp4)
 
 The demo video shows ChessGNN running as a live Lichess bot through the
-`cal_elo/lichess-bot` adapter. The bot loads a PyTorch checkpoint, converts the
-current Lichess board to a graph with `python-chess`, masks illegal moves, and
-selects a move from the model policy head. The adapter also contains an optional
-`LatentMCTS` mode for search-based play.
-
-Demo integration files:
-
-- `cal_elo/lichess-bot/homemade.py` - ChessGNN engine wrapper for lichess-bot.
-- `cal_elo/lichess-bot/auto_ai_loop.py` - automated Lichess AI game loop.
-- `cal_elo/evaluate_lichess_logs.py` - parser for bot logs and score summaries.
+Lichess bot bridge used during local development. The bot loads a PyTorch
+checkpoint, converts the current Lichess board to a graph with `python-chess`,
+masks illegal moves, and selects a move from the model policy head. The local
+development version also supports optional latent MCTS-style search.
 
 Current qualitative result: the Phase 1 policy/value checkpoint can play legal
 and coherent games online without hand-written chess search, with stronger play
 in opening/middlegame positions than in endgames. Formal Elo is not claimed yet;
-the `cal_elo` tools are included to make future comparisons reproducible and
+evaluation tooling was built locally to make future comparisons reproducible and
 balanced by color and Lichess AI level.
 
 ## Motivation / Problem
@@ -226,168 +225,70 @@ policy_index = move.from_square * 64 + move.to_square
 The model outputs a dense 4096-way policy, then masks it with the legal move
 matrix from `python-chess`.
 
-## Repository Map
+## Public Repository Contents
+
+This public repository is currently a portfolio documentation package, not the
+full training code release. It intentionally contains only:
 
 | Path | Purpose |
 | --- | --- |
-| `chessgnn/graph_representation.py` | Board-to-graph conversion and chess feature engineering |
-| `chessgnn/gnn_encoder.py` | Edge-conditioned GATv2 encoder |
-| `chessgnn/spatio_temporal.py` | Batched full-game GNN encoder |
-| `chessgnn/game_transformer.py` | RoPE causal Transformer and square cross-attention |
-| `chessgnn/world_model_vae.py` | VAE posterior, graph decoder, transition model, heads |
-| `chessgnn/diffusion_decoder.py` | Conditional graph diffusion denoiser |
-| `chessgnn/ebm_correction.py` | Energy model, legality pipeline, Langevin correction |
-| `chessgnn/adversarial_latent.py` | Latent-space adversarial RL components |
-| `chessgnn/hierarchical_temporal.py` | Multi-scale temporal modeling |
-| `chessgnn/model.py` | Unified `ChessGNNModel` wrapper |
-| `chessgnn/training.py` | Phase 1/2/3 trainers and training config |
-| `chessgnn/data_pipeline.py` | PGN/FEN datasets, move indexing, graph collation |
-| `chessgnn/self_play.py` | Replay buffer, latent search, MCTS |
-| `chessgnn/parallel_self_play.py` | Multi-process self-play and batched inference |
-| `cal_elo/` | Lichess bot demo and evaluation tooling |
-| `edge_AI/` | ONNX / edge deployment experiments |
-| `tests/` | Unit and integration tests |
+| `README.md` | Architecture, motivation, demo notes, and project status |
+| `docs/demo/lichess_chessgnn_demo.mp4` | Compressed Lichess gameplay demo |
+| `docs/demo/lichess_chessgnn_demo.jpg` | Demo thumbnail / fallback preview |
 
-## Quick Start
+The implementation code, training scripts, checkpoints, logs, private tokens,
+and large experiment artifacts are not included in this public repo yet.
+The README describes the implemented local system so recruiters and technical
+reviewers can understand the architecture without downloading large model
+artifacts or private development files.
 
-Install the core dependencies:
+## Implementation Scope
 
-```bash
-pip install torch torch_geometric python-chess numpy
-```
+The local implementation is organized around these components:
 
-Optional but useful:
+| Component | Role |
+| --- | --- |
+| Graph representation | Converts a board into 64 square nodes and typed chess edges |
+| Edge-conditioned GATv2 encoder | Performs relational message passing over legal moves, attacks, defenses, pins, and control |
+| Full-game encoder | Batches all positions in a game and produces square-level and position-level embeddings |
+| Causal game Transformer | Models move history with RoPE positional encoding |
+| Square cross-attention | Re-injects per-square spatial information before policy/value prediction |
+| VAE world model | Learns a latent state distribution and reconstructs graph structure |
+| Transition Transformer | Predicts future latent states |
+| Diffusion decoder | Refines node/edge graph embeddings |
+| Energy model | Scores graph states for legality correction experiments |
+| Self-play/search layer | Uses replay, latent search, and optional MCTS-style planning |
+| Lichess adapter | Connects a trained checkpoint to live online play |
 
-```bash
-pip install tqdm psutil stockfish
-```
+This avoids listing source paths that are not present in the public repo while
+still documenting what was built.
 
-Run tests:
+## Demo Setup Summary
 
-```bash
-pytest tests/ -v
-```
+The Lichess demo was produced with a local adapter around `lichess-bot`:
 
-Run the web demo:
+1. Lichess sends the current board state to the local bot.
+2. The adapter converts the position to a `python-chess` board.
+3. ChessGNN builds the heterogeneous graph representation.
+4. The policy/value checkpoint scores all 4096 from-square/to-square moves.
+5. Illegal moves are masked.
+6. The highest-scoring legal move is sent back to Lichess.
 
-```bash
-python web_demo.py --checkpoint checkpoints/v2_phase2_best.pt --port 8000
-```
+The public video is a compressed artifact of that workflow. It is meant as a
+readable HR/portfolio demo, not as an Elo benchmark.
 
-Train Phase 1 locally:
+## Evaluation Plan
 
-```bash
-python run_phase0_local.py --data-dir <path-to-pgn-data> --n-workers 64 --depth 10
-```
-
-Run Phase 2 world-model training:
-
-```bash
-python run_phase2_vastai.py
-```
-
-Run Phase 3 self-play training:
-
-```bash
-python run_phase3_vastai.py
-```
-
-## Lichess Bot Demo
-
-The Lichess demo uses the upstream `lichess-bot` project as a bridge and
-implements ChessGNN as a homemade engine.
-
-Typical local flow:
-
-```bash
-cd cal_elo/lichess-bot
-python lichess-bot.py
-```
-
-In another terminal, start automated games against Lichess AI:
-
-```bash
-python cal_elo/lichess-bot/auto_ai_loop.py --level 5 --level 6 --color alternate
-```
-
-Important notes:
-
-- The Lichess OAuth token must stay private and should never be committed.
-- Checkpoints are large and should usually be shared through releases, cloud
-  storage, or Git LFS instead of normal git history.
-- The included demo video is a compressed portfolio artifact, not a benchmark.
-
-## Evaluation
-
-The `cal_elo` folder contains scripts for collecting and analyzing games from
-Lichess bot logs:
-
-```bash
-python cal_elo/evaluate_lichess_logs.py summary \
-  cal_elo/lichess-bot/lichess_bot_auto_logs/lichess-bot.log \
-  --label phase1_window
-```
-
-For fair checkpoint comparison, use fixed buckets by level and color:
-
-```bash
-python cal_elo/run_fixed_benchmark.py \
-  --baseline-key phase1_interrupted \
-  --candidate-key phase2_ep001 \
-  --label-baseline phase1 \
-  --label-candidate phase2
-```
-
-Recommended protocol before making rating claims:
+Before making any formal strength claim, the evaluation should use:
 
 - At least 40 games per checkpoint.
 - Balanced white/black games.
 - Fixed Lichess AI level distribution.
-- Report raw score and balanced score by bucket.
-- Keep endgame failures separate from opening/middlegame move quality.
+- Raw score and bucket-balanced score.
+- Separate reporting for opening/middlegame quality and endgame failures.
 
-## Training Configuration
-
-Central configuration lives in `TrainConfig`:
-
-```python
-from chessgnn.training import TrainConfig
-
-config = TrainConfig.kaggle_t4()
-```
-
-The config includes:
-
-- Phase-specific learning rates.
-- Batch sizes and gradient clipping.
-- AMP and gradient accumulation.
-- KL warmup and free-bits.
-- Phase 2 split-stage gates.
-- Replay buffer size and self-play settings.
-- Parallel self-play worker count.
-
-The model is designed to run on CUDA when available:
-
-```python
-device = torch.device(config.device)
-```
-
-## Checkpoint Format
-
-Checkpoints follow this structure:
-
-```python
-{
-    "model_state_dict": {...},
-    "optimizer_state_dict": {...},
-    "scheduler_state_dict": {...},
-    "scaler_state_dict": {...},
-    "epoch": int,
-    "phase": str,
-    "metrics": {...},
-    "config": TrainConfig(...),
-}
-```
+This is why the README only makes a qualitative demo claim rather than a formal
+rating claim.
 
 ## Current Status and Limitations
 
@@ -434,4 +335,3 @@ Short CV version:
 > causal RoPE Transformer and square-level cross-attention. Extended the system
 > toward a latent world model with VAE, transition Transformer, diffusion graph
 > refinement, EBM legality scoring, and self-play search infrastructure.
-
